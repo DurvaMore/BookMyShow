@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Movie } from "@/data/movies";
+import type { DbMovie } from "@/hooks/useMovies";
 
 interface HeroCarouselProps {
-  movies: Movie[];
+  movies: DbMovie[];
+  onBookNow?: (movie: DbMovie) => void;
 }
 
-const HeroCarousel = ({ movies }: HeroCarouselProps) => {
+const HeroCarousel = ({ movies, onBookNow }: HeroCarouselProps) => {
   const [current, setCurrent] = useState(0);
 
   const next = useCallback(() => {
@@ -22,6 +23,8 @@ const HeroCarousel = ({ movies }: HeroCarouselProps) => {
     const timer = setInterval(next, 5000);
     return () => clearInterval(timer);
   }, [next]);
+
+  if (movies.length === 0) return null;
 
   const movie = movies[current];
 
@@ -44,7 +47,10 @@ const HeroCarousel = ({ movies }: HeroCarouselProps) => {
               {movie.genre.join(" • ")}
             </p>
             <p className="mt-2 text-sm text-foreground/80 sm:text-base">{movie.description}</p>
-            <Button className="mt-4 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold px-6">
+            <Button
+              className="mt-4 font-semibold px-6"
+              onClick={() => onBookNow?.(movie)}
+            >
               Book Now
             </Button>
           </div>

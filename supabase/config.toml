@@ -1,0 +1,4 @@
+project_id = "hwribxqrqeuraitkxzce"
+
+[functions.update-availability]
+verify_jwt = false
