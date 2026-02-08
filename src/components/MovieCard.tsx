@@ -1,17 +1,22 @@
 import { Star } from "lucide-react";
-import type { Movie } from "@/data/movies";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import type { DbMovie } from "@/hooks/useMovies";
 
 interface MovieCardProps {
-  movie: Movie;
+  movie: DbMovie;
+  onBookNow?: () => void;
 }
 
-const MovieCard = ({ movie }: MovieCardProps) => {
+const MovieCard = ({ movie, onBookNow }: MovieCardProps) => {
+  const isAvailable = movie.availability === "now_showing" && (movie.available_seats ?? 0) > 0;
+
   return (
     <div className="group cursor-pointer overflow-hidden rounded-lg bg-card border border-border transition-all hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5">
       {/* Poster */}
       <div className="relative aspect-[2/3] overflow-hidden">
         <img
-          src={movie.poster}
+          src={movie.poster ?? "/placeholder.svg"}
           alt={movie.title}
           className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
@@ -21,6 +26,33 @@ const MovieCard = ({ movie }: MovieCardProps) => {
           <Star className="h-3 w-3 fill-primary text-primary" />
           {movie.rating}
         </div>
+
+        {/* Availability badge */}
+        {movie.availability === "coming_soon" && (
+          <Badge className="absolute top-2 left-2 bg-accent text-accent-foreground text-[10px]">
+            Coming Soon
+          </Badge>
+        )}
+        {movie.availability === "housefull" && (
+          <Badge variant="destructive" className="absolute top-2 left-2 text-[10px]">
+            Housefull
+          </Badge>
+        )}
+
+        {/* Book overlay on hover */}
+        {isAvailable && onBookNow && (
+          <div className="absolute inset-0 flex items-end bg-gradient-to-t from-background/90 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100">
+            <Button
+              className="m-3 w-[calc(100%-1.5rem)] font-semibold"
+              onClick={(e) => {
+                e.stopPropagation();
+                onBookNow();
+              }}
+            >
+              Book Now — ₹{movie.price ?? 250}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Info */}
@@ -33,6 +65,11 @@ const MovieCard = ({ movie }: MovieCardProps) => {
             </span>
           ))}
         </p>
+        {isAvailable && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {movie.available_seats} seats left
+          </p>
+        )}
       </div>
     </div>
   );
