@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Minus, Plus, Loader2, CheckCircle2, Ticket, MapPin, Clock, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import type { DbMovie } from "@/hooks/useMovies";
+import SeatMap from "@/components/SeatMap";
 
 interface BookingDialogProps {
   movie: DbMovie | null;
@@ -15,12 +16,13 @@ interface BookingDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = "theaters" | "seats" | "paying" | "confirmed";
+type Step = "theaters" | "seats" | "seatMap" | "paying" | "confirmed";
 
 const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
   const [seats, setSeats] = useState(1);
   const [step, setStep] = useState<Step>("theaters");
   const [selectedShowtime, setSelectedShowtime] = useState<ShowtimeWithTheater | null>(null);
+  const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
   const createBooking = useCreateBooking();
@@ -42,6 +44,7 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
     setStep("theaters");
     setSeats(1);
     setSelectedShowtime(null);
+    setSelectedSeatIds([]);
     onOpenChange(false);
   };
 
@@ -85,7 +88,7 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Booking failed";
       toast.error(message);
-      setStep("seats");
+      setStep("seatMap");
     }
   };
 
@@ -107,6 +110,8 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
               ? "Booking Confirmed!"
               : step === "theaters"
               ? `Theaters Showing ${movie.title}`
+              : step === "seatMap"
+              ? "Select Your Seats"
               : `Book — ${movie.title}`}
           </DialogTitle>
         </DialogHeader>
@@ -227,12 +232,26 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
 
             <Button
               className="w-full font-semibold"
-              onClick={handleBook}
-              disabled={createBooking.isPending || maxSeats <= 0}
+              onClick={() => setStep("seatMap")}
+              disabled={maxSeats <= 0}
             >
-              {maxSeats <= 0 ? "Housefull" : "Pay & Book"}
+              {maxSeats <= 0 ? "Housefull" : "Select Seats"}
             </Button>
           </div>
+        )}
+
+        {/* STEP: Seat Map */}
+        {step === "seatMap" && selectedShowtime && (
+          <SeatMap
+            totalSeats={80}
+            availableSeats={selectedShowtime.available_seats}
+            maxSelectable={seats}
+            onBack={() => setStep("seats")}
+            onConfirm={(seatIds) => {
+              setSelectedSeatIds(seatIds);
+              handleBook();
+            }}
+          />
         )}
 
         {/* STEP: Payment */}
@@ -250,6 +269,9 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
             <CheckCircle2 className="h-12 w-12 text-green-500" />
             <div className="text-center">
               <p className="font-semibold">{seats} ticket(s) booked!</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Seats: {selectedSeatIds.join(", ")}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 Total paid: ₹{total}
               </p>
