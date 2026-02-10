@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { format, addDays, parseISO, isSameDay } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useCreateBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
 import { useShowtimes, groupByTheater, type ShowtimeWithTheater } from "@/hooks/useShowtimes";
 import { toast } from "sonner";
-import { Minus, Plus, Loader2, CheckCircle2, Ticket, MapPin, Clock, ArrowLeft, CreditCard, Smartphone, Building } from "lucide-react";
+import { Minus, Plus, Loader2, CheckCircle2, Ticket, MapPin, Clock, ArrowLeft, CreditCard, Smartphone, Building, CalendarDays } from "lucide-react";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import type { DbMovie } from "@/hooks/useMovies";
@@ -26,6 +28,7 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
   const [selectedShowtime, setSelectedShowtime] = useState<ShowtimeWithTheater | null>(null);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const { user } = useAuth();
   const navigate = useNavigate();
   const createBooking = useCreateBooking();
@@ -34,6 +37,26 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
   const { data: showtimes = [], isLoading: loadingShowtimes } = useShowtimes(
     open && movie ? movie.id : undefined
   );
+
+  // Get unique dates from showtimes, fallback to next 7 days
+  const availableDates = useMemo(() => {
+    const dateSet = new Set<string>();
+    showtimes.forEach((st) => dateSet.add(st.show_date));
+    if (dateSet.size === 0) {
+      // Fallback: show next 7 days
+      for (let i = 0; i < 7; i++) {
+        dateSet.add(format(addDays(new Date(), i), "yyyy-MM-dd"));
+      }
+    }
+    return Array.from(dateSet).sort().map((d) => parseISO(d));
+  }, [showtimes]);
+
+  // Filter showtimes by selected date, then group by theater
+  const filteredGrouped = useMemo(() => {
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const filtered = showtimes.filter((st) => st.show_date === dateStr);
+    return groupByTheater(filtered);
+  }, [showtimes, selectedDate]);
 
   const grouped = groupByTheater(showtimes);
 
@@ -49,6 +72,7 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
     setSelectedShowtime(null);
     setSelectedSeatIds([]);
     setPaymentMethod(null);
+    setSelectedDate(new Date());
     onOpenChange(false);
   };
 
@@ -131,45 +155,88 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
               <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
               </div>
-            ) : grouped.length === 0 ? (
-              <p className="text-center text-muted-foreground py-6">
-                No showtimes available for this movie.
-              </p>
             ) : (
-              grouped.map(({ theater, shows }) => (
-                <div
-                  key={theater.id}
-                  className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3"
-                >
-                  <div>
-                    <h3 className="font-semibold text-sm">{theater.name}</h3>
-                    {theater.location && (
-                      <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                        <MapPin className="h-3 w-3" />
-                        {theater.location}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {shows.map((st) => (
-                      <Button
-                        key={st.id}
-                        variant="outline"
-                        size="sm"
-                        disabled={st.available_seats <= 0}
-                        onClick={() => handleSelectShowtime(st)}
-                        className="gap-1.5 text-xs"
-                      >
-                        <Clock className="h-3 w-3" />
-                        {formatTime(st.show_time)}
-                        <span className="text-muted-foreground">
-                          ({st.available_seats} seats)
-                        </span>
-                      </Button>
-                    ))}
-                  </div>
+              <>
+                {/* Horizontal Date Selector */}
+                <div className="space-y-2">
+                  <h3 className="flex items-center gap-1.5 font-semibold text-sm">
+                    <CalendarDays className="h-4 w-4 text-primary" />
+                    Select Date
+                  </h3>
+                  <ScrollArea className="w-full whitespace-nowrap">
+                    <div className="flex gap-2 pb-2">
+                      {availableDates.map((date) => {
+                        const isSelected = isSameDay(date, selectedDate);
+                        return (
+                          <button
+                            key={date.toISOString()}
+                            onClick={() => setSelectedDate(date)}
+                            className={cn(
+                              "flex flex-col items-center rounded-lg border px-3 py-2 min-w-[60px] transition-all shrink-0",
+                              isSelected
+                                ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                                : "border-border hover:border-primary/40 hover:bg-secondary/50"
+                            )}
+                          >
+                            <span className={cn("text-[10px] uppercase font-medium", isSelected ? "text-primary" : "text-muted-foreground")}>
+                              {format(date, "EEE")}
+                            </span>
+                            <span className={cn("text-lg font-bold leading-tight", isSelected ? "text-primary" : "text-foreground")}>
+                              {format(date, "dd")}
+                            </span>
+                            <span className={cn("text-[10px]", isSelected ? "text-primary" : "text-muted-foreground")}>
+                              {format(date, "MMM")}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                  </ScrollArea>
                 </div>
-              ))
+
+                {/* Theaters & Showtimes for selected date */}
+                {filteredGrouped.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-6">
+                    No showtimes available on {format(selectedDate, "EEEE, MMM dd")}.
+                  </p>
+                ) : (
+                  filteredGrouped.map(({ theater, shows }) => (
+                    <div
+                      key={theater.id}
+                      className="rounded-lg border border-border bg-secondary/30 p-4 space-y-3"
+                    >
+                      <div>
+                        <h3 className="font-semibold text-sm">{theater.name}</h3>
+                        {theater.location && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <MapPin className="h-3 w-3" />
+                            {theater.location}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {shows.map((st) => (
+                          <Button
+                            key={st.id}
+                            variant="outline"
+                            size="sm"
+                            disabled={st.available_seats <= 0}
+                            onClick={() => handleSelectShowtime(st)}
+                            className="gap-1.5 text-xs"
+                          >
+                            <Clock className="h-3 w-3" />
+                            {formatTime(st.show_time)}
+                            <span className="text-muted-foreground">
+                              ({st.available_seats} seats)
+                            </span>
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </>
             )}
           </div>
         )}
