@@ -30,13 +30,7 @@ public/ → Static assets
 supabase/ → Backend configuration  
 components/ → Reusable UI components  
 
-## Installation & Setup
-
-Clone the repository:
-```bash
-git clone https://github.com/DurvaMore/BookMyShow.git
-
-##Learning Outcomes
+## Learning Outcomes
 
 This project helped me learn:
 Building scalable React applications
@@ -44,3 +38,11 @@ Using TypeScript in frontend development
 Integrating Supabase as a backend service
 Component-driven UI design
 Modern project structuring
+
+## Installation & Setup
+
+Clone the repository:
+```bash
+git clone https://github.com/DurvaMore/BookMyShow.git
+
+
