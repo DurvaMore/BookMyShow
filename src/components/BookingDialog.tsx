@@ -5,8 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useCreateBooking, useUpdateBookingStatus } from "@/hooks/useBookings";
 import { useShowtimes, groupByTheater, type ShowtimeWithTheater } from "@/hooks/useShowtimes";
 import { toast } from "sonner";
-import { Minus, Plus, Loader2, CheckCircle2, Ticket, MapPin, Clock, ArrowLeft } from "lucide-react";
+import { Minus, Plus, Loader2, CheckCircle2, Ticket, MapPin, Clock, ArrowLeft, CreditCard, Smartphone, Building } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import type { DbMovie } from "@/hooks/useMovies";
 import SeatMap from "@/components/SeatMap";
 
@@ -16,13 +17,15 @@ interface BookingDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = "theaters" | "seats" | "seatMap" | "paying" | "confirmed";
+type Step = "theaters" | "seats" | "seatMap" | "payment" | "paying" | "confirmed";
+type PaymentMethod = "debit" | "credit" | "upi";
 
 const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
   const [seats, setSeats] = useState(1);
   const [step, setStep] = useState<Step>("theaters");
   const [selectedShowtime, setSelectedShowtime] = useState<ShowtimeWithTheater | null>(null);
   const [selectedSeatIds, setSelectedSeatIds] = useState<string[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const createBooking = useCreateBooking();
@@ -45,6 +48,7 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
     setSeats(1);
     setSelectedShowtime(null);
     setSelectedSeatIds([]);
+    setPaymentMethod(null);
     onOpenChange(false);
   };
 
@@ -112,6 +116,10 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
               ? `Theaters Showing ${movie.title}`
               : step === "seatMap"
               ? "Select Your Seats"
+              : step === "payment"
+              ? "Payment"
+              : step === "paying"
+              ? "Processing Payment"
               : `Book — ${movie.title}`}
           </DialogTitle>
         </DialogHeader>
@@ -249,12 +257,83 @@ const BookingDialog = ({ movie, open, onOpenChange }: BookingDialogProps) => {
             onBack={() => setStep("seats")}
             onConfirm={(seatIds) => {
               setSelectedSeatIds(seatIds);
-              handleBook();
+              setStep("payment");
             }}
           />
         )}
 
-        {/* STEP: Payment */}
+        {/* STEP: Payment Method */}
+        {step === "payment" && selectedShowtime && (
+          <div className="space-y-5 pt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-xs text-muted-foreground -ml-2"
+              onClick={() => setStep("seatMap")}
+            >
+              <ArrowLeft className="h-3 w-3" /> Change seats
+            </Button>
+
+            {/* Booking Summary */}
+            <div className="rounded-lg border border-border bg-secondary/30 p-4 space-y-2">
+              <h3 className="font-semibold text-sm">Booking Summary</h3>
+              <div className="text-sm space-y-1 text-muted-foreground">
+                <p><span className="font-medium text-foreground">Movie:</span> {movie.title}</p>
+                <p><span className="font-medium text-foreground">Theater:</span> {selectedShowtime.theater.name}</p>
+                <p><span className="font-medium text-foreground">Showtime:</span> {formatTime(selectedShowtime.show_time)}</p>
+                <p><span className="font-medium text-foreground">Seats:</span> {selectedSeatIds.join(", ")}</p>
+                <p><span className="font-medium text-foreground">Tickets:</span> {seats} × ₹{price}</p>
+              </div>
+              <div className="flex items-center justify-between border-t border-border pt-2 mt-2">
+                <span className="font-semibold text-sm">Total Amount</span>
+                <span className="text-lg font-bold text-primary">₹{total}</span>
+              </div>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm">Select Payment Method</h3>
+              {([
+                { id: "debit" as PaymentMethod, label: "Debit Card", icon: CreditCard, desc: "Pay with your debit card" },
+                { id: "credit" as PaymentMethod, label: "Credit Card", icon: Building, desc: "Pay with your credit card" },
+                { id: "upi" as PaymentMethod, label: "UPI", icon: Smartphone, desc: "Pay via UPI (GPay, PhonePe, etc.)" },
+              ]).map((method) => (
+                <button
+                  key={method.id}
+                  onClick={() => setPaymentMethod(method.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all",
+                    paymentMethod === method.id
+                      ? "border-primary bg-primary/10 ring-1 ring-primary/30"
+                      : "border-border hover:border-primary/40 hover:bg-secondary/50"
+                  )}
+                >
+                  <method.icon className={cn("h-5 w-5", paymentMethod === method.id ? "text-primary" : "text-muted-foreground")} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{method.label}</p>
+                    <p className="text-xs text-muted-foreground">{method.desc}</p>
+                  </div>
+                  <div className={cn(
+                    "h-4 w-4 rounded-full border-2 flex items-center justify-center",
+                    paymentMethod === method.id ? "border-primary" : "border-muted-foreground/40"
+                  )}>
+                    {paymentMethod === method.id && <div className="h-2 w-2 rounded-full bg-primary" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <Button
+              className="w-full font-semibold"
+              disabled={!paymentMethod}
+              onClick={handleBook}
+            >
+              Pay ₹{total}
+            </Button>
+          </div>
+        )}
+
+        {/* STEP: Processing Payment */}
         {step === "paying" && (
           <div className="flex flex-col items-center gap-4 py-8">
             <Loader2 className="h-10 w-10 animate-spin text-primary" />
